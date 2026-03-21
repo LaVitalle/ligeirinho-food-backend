@@ -5,6 +5,7 @@ import { validate } from "@shared/infra/config/env.validation";
 import { GlobalExceptionFilter } from "@shared/infra/filters/global-exception.filter";
 import { TransformInterceptor } from "@shared/infra/interceptors/transform.interceptor";
 import { SharedModule } from "@shared/shared.module";
+import { LocationModule } from "./modules/location/location.module";
 
 @Module({
   imports: [
@@ -14,6 +15,7 @@ import { SharedModule } from "@shared/shared.module";
       validate,
     }),
     SharedModule,
+    LocationModule,
   ],
   providers: [
     { provide: APP_INTERCEPTOR, useClass: TransformInterceptor },
