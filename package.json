@@ -13,7 +13,8 @@
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
-    "db:seed:location": "cross-env NODE_ENV=development npx tsx src/shared/infra/database/seeds/seed-location.ts"
+    "db:seed:location": "cross-env NODE_ENV=development npx tsx src/shared/infra/database/seeds/seed-location.ts",
+    "db:seed:location:prod": "cross-env NODE_ENV=production npx tsx src/shared/infra/database/seeds/seed-location.ts"
   },
   "dependencies": {
     "@nestjs/common": "^11.1.17",
