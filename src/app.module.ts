@@ -11,6 +11,7 @@ import { LocationModule } from "./modules/location/location.module";
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
+      ignoreEnvFile: process.env.NODE_ENV === "production",
       envFilePath: `envs/.env.${process.env.NODE_ENV || "development"}`,
       validate,
     }),
