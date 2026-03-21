@@ -1,0 +1,43 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: ligeirinho-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: ligeirinho
+      POSTGRES_PASSWORD: ligeirinho
+      POSTGRES_DB: ligeirinho_food
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  minio:
+    image: minio/minio:latest
+    container_name: ligeirinho-minio
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: ligeirinho-admin
+      MINIO_ROOT_PASSWORD: ligeirinho-dev-2026
+    volumes:
+      - miniodata:/data
+    command: server /data --console-address ":9001"
+
+  minio-init:
+    image: minio/mc:latest
+    container_name: ligeirinho-minio-init
+    depends_on:
+      - minio
+    entrypoint: >
+      /bin/sh -c "
+        sleep 3;
+        mc alias set local http://minio:9000 ligeirinho-admin ligeirinho-dev-2026;
+        mc mb local/ligeirinho --ignore-existing;
+        mc anonymous set download local/ligeirinho;
+        echo 'Bucket ligeirinho pronto (leitura publica)';
+      "
+
+volumes:
+  pgdata:
+  miniodata:

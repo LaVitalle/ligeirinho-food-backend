@@ -1,0 +1,46 @@
+{
+  "name": "ligeirinho-food-backend",
+  "version": "0.0.1",
+  "description": "Ligeirinho Food - Backend API",
+  "private": true,
+  "license": "UNLICENSED",
+  "scripts": {
+    "build": "nest build",
+    "dev": "cross-env NODE_ENV=development nest start --watch",
+    "dev:debug": "cross-env NODE_ENV=development nest start --debug --watch",
+    "start:prod": "cross-env NODE_ENV=production node dist/main",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:push": "drizzle-kit push",
+    "db:studio": "drizzle-kit studio"
+  },
+  "dependencies": {
+    "@nestjs/common": "^11.1.17",
+    "@nestjs/config": "^4.0.3",
+    "@nestjs/core": "^11.1.17",
+    "@nestjs/platform-express": "^11.1.17",
+    "@nestjs/swagger": "^11.2.6",
+    "class-transformer": "^0.5.1",
+    "class-validator": "^0.15.1",
+    "drizzle-orm": "^0.45.1",
+    "minio": "^8.0.7",
+    "postgres": "^3.4.8",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.2"
+  },
+  "devDependencies": {
+    "@nestjs/cli": "^11.0.16",
+    "@nestjs/schematics": "^11.0.9",
+    "@nestjs/testing": "^11.1.17",
+    "@types/express": "^5.0.6",
+    "@types/node": "^25.5.0",
+    "cross-env": "^10.1.0",
+    "dotenv": "^17.3.1",
+    "drizzle-kit": "^0.31.10",
+    "open": "^11.0.0",
+    "source-map-support": "^0.5.21",
+    "ts-node": "^10.9.2",
+    "tsconfig-paths": "^4.2.0",
+    "typescript": "~5.7"
+  }
+}
