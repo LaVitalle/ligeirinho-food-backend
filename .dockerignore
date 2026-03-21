@@ -1,0 +1,27 @@
+node_modules
+dist
+.git
+.gitignore
+.dockerignore
+
+# Environment files (injected via container env vars)
+envs/
+.env
+.env.*
+
+# IDE
+.vscode
+.cursor
+.idea
+.claude
+
+# Docs
+*.md
+
+# Local dev
+docker-compose.yml
+.tmp
+.temp
+tmp
+logs
+*.log

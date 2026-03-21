@@ -5,7 +5,7 @@
   "private": true,
   "license": "UNLICENSED",
   "scripts": {
-    "build": "nest build",
+    "build": "nest build && tsc-alias",
     "dev": "cross-env NODE_ENV=development nest start --watch",
     "dev:debug": "cross-env NODE_ENV=development nest start --debug --watch",
     "start:prod": "cross-env NODE_ENV=production node dist/main",
@@ -41,6 +41,7 @@
     "open": "^11.0.0",
     "source-map-support": "^0.5.21",
     "ts-node": "^10.9.2",
+    "tsc-alias": "^1.8.16",
     "tsconfig-paths": "^4.2.0",
     "typescript": "~5.7"
   }
