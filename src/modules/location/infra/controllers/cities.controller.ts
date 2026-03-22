@@ -2,6 +2,7 @@ import { Controller, Get, Param, ParseIntPipe } from "@nestjs/common";
 import { ApiParam, ApiTags } from "@nestjs/swagger";
 import { ResponseMessage } from "@shared/infra/decorators/response-message.decorator";
 import { ApiWrappedResponse } from "@shared/infra/swagger/api-response.dto";
+import { Public } from "@shared/infra/decorators/public.decorator";
 import { CityDto } from "../../application/dto/city.dto";
 import { LocationService } from "../../application/services/location.service";
 
@@ -11,6 +12,7 @@ export class CitiesController {
   constructor(private readonly locationService: LocationService) {}
 
   @Get(":stateId")
+  @Public()
   @ResponseMessage("Cidades listadas com sucesso")
   @ApiWrappedResponse(CityDto, {
     isArray: true,

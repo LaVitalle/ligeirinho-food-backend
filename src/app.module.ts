@@ -6,6 +6,8 @@ import { GlobalExceptionFilter } from "@shared/infra/filters/global-exception.fi
 import { TransformInterceptor } from "@shared/infra/interceptors/transform.interceptor";
 import { SharedModule } from "@shared/shared.module";
 import { LocationModule } from "./modules/location/location.module";
+import { UsersModule } from "./modules/users/users.module";
+import { AuthModule } from "./modules/auth/auth.module";
 
 @Module({
   imports: [
@@ -17,6 +19,8 @@ import { LocationModule } from "./modules/location/location.module";
     }),
     SharedModule,
     LocationModule,
+    UsersModule,
+    AuthModule,
   ],
   providers: [
     { provide: APP_INTERCEPTOR, useClass: TransformInterceptor },
