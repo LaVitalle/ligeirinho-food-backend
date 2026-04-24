@@ -15,6 +15,13 @@
       "when": 1774055384157,
       "tag": "0001_tearful_taskmaster",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1775780791280,
+      "tag": "0002_whole_puppet_master",
+      "breakpoints": true
     }
   ]
 }
