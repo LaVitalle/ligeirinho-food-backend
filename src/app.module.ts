@@ -8,6 +8,7 @@ import { SharedModule } from "@shared/shared.module";
 import { LocationModule } from "./modules/location/location.module";
 import { UsersModule } from "./modules/users/users.module";
 import { AuthModule } from "./modules/auth/auth.module";
+import { InstitutionsModule } from "./modules/institutions/institutions.module";
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { AuthModule } from "./modules/auth/auth.module";
     LocationModule,
     UsersModule,
     AuthModule,
+    InstitutionsModule,
   ],
   providers: [
     { provide: APP_INTERCEPTOR, useClass: TransformInterceptor },
