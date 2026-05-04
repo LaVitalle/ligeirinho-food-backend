@@ -16,6 +16,6 @@ import { DrizzleInstitutionRepository } from "./infra/repositories/drizzle-insti
       useExisting: DrizzleInstitutionRepository,
     },
   ],
-  exports: [InstitutionService],
+  exports: [InstitutionService, INSTITUTION_REPOSITORY, DrizzleInstitutionRepository],
 })
 export class InstitutionsModule {}

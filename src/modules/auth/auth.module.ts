@@ -7,6 +7,7 @@ import { EmailModule } from "@shared/infra/email/email.module";
 import { JwtAuthGuard } from "@shared/infra/guards/jwt-auth.guard";
 import { RolesGuard } from "@shared/infra/guards/roles.guard";
 import { UsersModule } from "../users/users.module";
+import { InstitutionsModule } from "../institutions/institutions.module";
 import { AuthService } from "./application/services/auth.service";
 import { PasswordRecoveryService } from "./application/services/password-recovery.service";
 import { AuthController } from "./infra/controllers/auth.controller";
@@ -25,6 +26,7 @@ import { JwtStrategy } from "./infra/strategies/jwt.strategy";
     }),
     SharedModule,
     UsersModule,
+    InstitutionsModule,
     EmailModule,
   ],
   controllers: [AuthController],

@@ -1,5 +1,5 @@
 import { Body, Controller, Post } from "@nestjs/common";
-import { ApiTags } from "@nestjs/swagger";
+import { ApiOperation, ApiTags } from "@nestjs/swagger";
 import { ResponseMessage } from "@shared/infra/decorators/response-message.decorator";
 import { ApiWrappedResponse } from "@shared/infra/swagger/api-response.dto";
 import { Public } from "@shared/infra/decorators/public.decorator";
@@ -22,6 +22,11 @@ export class AuthController {
 
   @Public()
   @Post("register")
+  @ApiOperation({
+    summary: "Registrar novo cliente",
+    description:
+      "Cria uma conta de CUSTOMER vinculada à instituição identificada pelo accessCode. Endpoint público — não requer autenticação.",
+  })
   @ResponseMessage("Usuário registrado com sucesso")
   @ApiWrappedResponse(AuthResponseDto, { description: "Registro de usuário" })
   async register(@Body() dto: RegisterDto) {
