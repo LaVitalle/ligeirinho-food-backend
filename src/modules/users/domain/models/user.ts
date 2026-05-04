@@ -12,6 +12,7 @@ export class User {
   private _canteenId?: string | null;
   private _createdAt: Date;
   private _updatedAt: Date;
+  private _deletedAt?: Date | null;
 
   private constructor(id: string) {
     this._id = id;
@@ -59,6 +60,10 @@ export class User {
 
   get updatedAt() {
     return this._updatedAt;
+  }
+
+  get deletedAt() {
+    return this._deletedAt ?? null;
   }
 
   withFullName(fullName: string): this {
@@ -111,6 +116,11 @@ export class User {
     return this;
   }
 
+  withDeletedAt(deletedAt?: Date | null): this {
+    this._deletedAt = deletedAt ?? null;
+    return this;
+  }
+
   static restore(
     props?:
       | {
@@ -125,6 +135,7 @@ export class User {
           canteenId?: string | null;
           createdAt: Date;
           updatedAt: Date;
+          deletedAt?: Date | null;
         }
       | null,
   ): User | null {
@@ -140,6 +151,7 @@ export class User {
     u._canteenId = props.canteenId ?? null;
     u._createdAt = props.createdAt;
     u._updatedAt = props.updatedAt;
+    u._deletedAt = props.deletedAt ?? null;
     return u;
   }
 }

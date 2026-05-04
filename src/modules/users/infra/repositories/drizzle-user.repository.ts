@@ -4,7 +4,7 @@ import { UserRole } from "@shared/domain/enums/user-role.enum";
 import { User } from "../../domain/models/user";
 import { UserRepository } from "../../domain/repositories/user.repository";
 import { usersSchema } from "../schemas/user.schema";
-import { eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 
 @Injectable()
 export class DrizzleUserRepository implements UserRepository {
@@ -30,6 +30,7 @@ export class DrizzleUserRepository implements UserRepository {
         canteenId: row.canteenId ?? null,
         createdAt: row.createdAt as unknown as Date,
         updatedAt: row.updatedAt as unknown as Date,
+        deletedAt: row.deletedAt as unknown as Date | null,
       },
     );
   }
@@ -38,7 +39,9 @@ export class DrizzleUserRepository implements UserRepository {
     const rows = await this.drizzle.db
       .select()
       .from(usersSchema)
-      .where(eq(usersSchema.email, email))
+      .where(
+        and(eq(usersSchema.email, email), isNull(usersSchema.deletedAt)),
+      )
       .limit(1);
     const row = rows[0];
     return User.restore(
@@ -54,6 +57,7 @@ export class DrizzleUserRepository implements UserRepository {
         canteenId: row.canteenId ?? null,
         createdAt: row.createdAt as unknown as Date,
         updatedAt: row.updatedAt as unknown as Date,
+        deletedAt: row.deletedAt as unknown as Date | null,
       },
     );
   }
@@ -94,6 +98,7 @@ export class DrizzleUserRepository implements UserRepository {
       canteenId: row.canteenId ?? null,
       createdAt: row.createdAt as unknown as Date,
       updatedAt: row.updatedAt as unknown as Date,
+      deletedAt: null,
     })!;
   }
 }
