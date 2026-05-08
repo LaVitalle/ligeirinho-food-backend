@@ -14,6 +14,7 @@ import { CanteensModule } from "./modules/canteens/canteens.module";
 import { CategoriesModule } from "./modules/categories/categories.module";
 import { ProductsModule } from "./modules/products/products.module";
 import { ExtrasModule } from "./modules/extras/extras.module";
+import { CartModule } from "./modules/cart/cart.module";
 
 @Module({
   imports: [
@@ -33,6 +34,7 @@ import { ExtrasModule } from "./modules/extras/extras.module";
     CategoriesModule,
     ProductsModule,
     ExtrasModule,
+    CartModule,
   ],
   providers: [
     { provide: APP_INTERCEPTOR, useClass: TransformInterceptor },
