@@ -1,5 +1,6 @@
 import {
   ConflictException,
+  ForbiddenException,
   Inject,
   Injectable,
   NotFoundException,
@@ -58,13 +59,22 @@ export class AuthService {
   }
 
   async login(dto: LoginDto): Promise<{ accessToken: string; user: UserDto }> {
-    const user = await this.userRepository.findByEmail(dto.email);
+    const user = await this.userRepository.findByEmailIncludeDeleted(dto.email);
     if (!user) {
       throw new UnauthorizedException("Credenciais inválidas");
     }
+
     const valid = await bcrypt.compare(dto.password, user.passwordHash);
     if (!valid) {
       throw new UnauthorizedException("Credenciais inválidas");
+    }
+
+    if (user.deletedAt !== null) {
+      throw new ForbiddenException({
+        code: "ACCOUNT_DEACTIVATED",
+        message:
+          "Sua conta está desativada. Use a recuperação de senha ou solicite reativação.",
+      });
     }
 
     const payload = { sub: user.id, email: user.email, role: user.role };

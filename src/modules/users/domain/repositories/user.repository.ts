@@ -6,6 +6,7 @@ export const USER_REPOSITORY = Symbol("USER_REPOSITORY");
 export interface UserRepository {
   findById(id: string): Promise<User | null>;
   findByEmail(email: string): Promise<User | null>;
+  findByEmailIncludeDeleted(email: string): Promise<User | null>;
   create(data: {
     fullName: string;
     email: string;
@@ -16,4 +17,14 @@ export interface UserRepository {
     institutionId?: string | null;
     canteenId?: string | null;
   }): Promise<User>;
+  update(
+    id: string,
+    data: Partial<{
+      fullName: string;
+      passwordHash: string;
+      phoneNumber: string | null;
+      profilePhotoUrl: string | null;
+      deletedAt: Date | null;
+    }>,
+  ): Promise<User>;
 }

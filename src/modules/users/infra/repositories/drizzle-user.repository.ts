@@ -62,6 +62,31 @@ export class DrizzleUserRepository implements UserRepository {
     );
   }
 
+  async findByEmailIncludeDeleted(email: string): Promise<User | null> {
+    const rows = await this.drizzle.db
+      .select()
+      .from(usersSchema)
+      .where(eq(usersSchema.email, email))
+      .limit(1);
+    const row = rows[0];
+    return User.restore(
+      row && {
+        id: row.id,
+        fullName: row.fullName,
+        email: row.email,
+        passwordHash: row.passwordHash,
+        phoneNumber: row.phoneNumber ?? null,
+        profilePhotoUrl: row.profilePhotoUrl ?? null,
+        role: row.role as UserRole,
+        institutionId: row.institutionId ?? null,
+        canteenId: row.canteenId ?? null,
+        createdAt: row.createdAt as unknown as Date,
+        updatedAt: row.updatedAt as unknown as Date,
+        deletedAt: row.deletedAt as unknown as Date | null,
+      },
+    );
+  }
+
   async create(data: {
     fullName: string;
     email: string;
@@ -99,6 +124,38 @@ export class DrizzleUserRepository implements UserRepository {
       createdAt: row.createdAt as unknown as Date,
       updatedAt: row.updatedAt as unknown as Date,
       deletedAt: null,
+    })!;
+  }
+
+  async update(
+    id: string,
+    data: Partial<{
+      fullName: string;
+      passwordHash: string;
+      phoneNumber: string | null;
+      profilePhotoUrl: string | null;
+      deletedAt: Date | null;
+    }>,
+  ): Promise<User> {
+    const [row] = await this.drizzle.db
+      .update(usersSchema)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(usersSchema.id, id))
+      .returning();
+
+    return User.restore({
+      id: row.id,
+      fullName: row.fullName,
+      email: row.email,
+      passwordHash: row.passwordHash,
+      phoneNumber: row.phoneNumber ?? null,
+      profilePhotoUrl: row.profilePhotoUrl ?? null,
+      role: row.role as UserRole,
+      institutionId: row.institutionId ?? null,
+      canteenId: row.canteenId ?? null,
+      createdAt: row.createdAt as unknown as Date,
+      updatedAt: row.updatedAt as unknown as Date,
+      deletedAt: row.deletedAt as unknown as Date | null,
     })!;
   }
 }
