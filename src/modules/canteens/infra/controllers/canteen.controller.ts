@@ -74,6 +74,24 @@ export class CanteenController {
     return this.canteenService.count(institutionId);
   }
 
+  @Get("me")
+  @Roles(UserRole.SELLER)
+  @ApiOperation({ summary: "Cantina do SELLER logado" })
+  @ResponseMessage("Cantina encontrada")
+  @ApiWrappedResponse(CanteenResponseDto, { description: "Cantina do SELLER" })
+  async findMine(@CurrentUser() user: User) {
+    return this.canteenService.findById(user.canteenId!);
+  }
+
+  @Patch("me")
+  @Roles(UserRole.SELLER)
+  @ApiOperation({ summary: "Edita perfil da cantina do SELLER logado" })
+  @ResponseMessage("Cantina atualizada com sucesso")
+  @ApiWrappedResponse(CanteenResponseDto, { description: "Cantina atualizada" })
+  async updateMine(@Body() dto: UpdateCanteenDto, @CurrentUser() user: User) {
+    return this.canteenService.update(user.canteenId!, dto, user);
+  }
+
   @Get(":id")
   @ApiOperation({ summary: "Detalhe de uma cantina" })
   @ResponseMessage("Cantina encontrada")
