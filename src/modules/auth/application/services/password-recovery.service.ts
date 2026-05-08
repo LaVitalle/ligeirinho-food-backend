@@ -39,9 +39,8 @@ export class PasswordRecoveryService {
   ) {}
 
   async requestRecovery(email: string): Promise<{ message: string }> {
-    const user = await this.userRepository.findByEmail(email);
+    const user = await this.userRepository.findByEmailIncludeDeleted(email);
     if (!user) {
-      // Não revelar a existência do email — comportamento idempotente.
       return { message: GENERIC_RESPONSE_MESSAGE };
     }
 
@@ -91,14 +90,31 @@ export class PasswordRecoveryService {
     email: string,
     code: string,
     newPassword: string,
-  ): Promise<{ message: string }> {
+  ): Promise<{ message: string; reactivated: boolean }> {
     const recovery = await this.assertCodeIsValid(email, code);
+
+    if (recovery.userDeleted) {
+      const activeUser = await this.userRepository.findByEmail(email);
+      if (activeUser) {
+        throw new BadRequestException(
+          "Este email já está em uso por outra conta ativa.",
+        );
+      }
+    }
 
     const passwordHash = await bcrypt.hash(newPassword, 10);
 
+    const updateData: Record<string, unknown> = {
+      passwordHash,
+      updatedAt: new Date(),
+    };
+    if (recovery.userDeleted) {
+      updateData.deletedAt = null;
+    }
+
     await this.drizzle.db
       .update(usersSchema)
-      .set({ passwordHash, updatedAt: new Date() })
+      .set(updateData)
       .where(eq(usersSchema.id, recovery.userId));
 
     await this.drizzle.db
@@ -106,7 +122,12 @@ export class PasswordRecoveryService {
       .set({ isUsed: true })
       .where(eq(passwordRecoverySchema.id, recovery.id));
 
-    return { message: "Senha redefinida com sucesso." };
+    return {
+      message: recovery.userDeleted
+        ? "Senha redefinida e conta reativada com sucesso."
+        : "Senha redefinida com sucesso.",
+      reactivated: recovery.userDeleted,
+    };
   }
 
   async requestReactivation(email: string): Promise<{ message: string }> {
@@ -211,8 +232,8 @@ export class PasswordRecoveryService {
   private async assertCodeIsValid(
     email: string,
     code: string,
-  ): Promise<{ id: string; userId: string }> {
-    const user = await this.userRepository.findByEmail(email);
+  ): Promise<{ id: string; userId: string; userDeleted: boolean }> {
+    const user = await this.userRepository.findByEmailIncludeDeleted(email);
     if (!user) {
       throw new BadRequestException("Código inválido ou expirado.");
     }
@@ -238,7 +259,7 @@ export class PasswordRecoveryService {
       throw new BadRequestException("Código inválido ou expirado.");
     }
 
-    return row;
+    return { ...row, userDeleted: user.deletedAt !== null };
   }
 
   private generateCode(): string {
