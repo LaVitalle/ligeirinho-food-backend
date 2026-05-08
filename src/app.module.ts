@@ -12,6 +12,7 @@ import { AuthModule } from "./modules/auth/auth.module";
 import { InstitutionsModule } from "./modules/institutions/institutions.module";
 import { CanteensModule } from "./modules/canteens/canteens.module";
 import { CategoriesModule } from "./modules/categories/categories.module";
+import { ProductsModule } from "./modules/products/products.module";
 
 @Module({
   imports: [
@@ -29,6 +30,7 @@ import { CategoriesModule } from "./modules/categories/categories.module";
     InstitutionsModule,
     CanteensModule,
     CategoriesModule,
+    ProductsModule,
   ],
   providers: [
     { provide: APP_INTERCEPTOR, useClass: TransformInterceptor },
