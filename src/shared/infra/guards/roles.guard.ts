@@ -23,13 +23,13 @@ export class RolesGuard implements CanActivate {
     if (roles.length === 0) return true;
 
     const request = context.switchToHttp().getRequest();
-    const user = request.user as { role?: UserRole } | undefined;
+    const user = request.user as { role: UserRole } | undefined;
 
     if (!user) {
       throw new UnauthorizedException();
     }
 
-    if (!user.role || !roles.includes(user.role)) {
+    if (!roles.includes(user.role)) {
       throw new ForbiddenException("Acesso não autorizado");
     }
 
