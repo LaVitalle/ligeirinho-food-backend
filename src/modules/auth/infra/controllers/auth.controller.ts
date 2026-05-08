@@ -1,5 +1,6 @@
 import { Body, Controller, Post } from "@nestjs/common";
 import { ApiOperation, ApiTags } from "@nestjs/swagger";
+import { Throttle } from "@nestjs/throttler";
 import { ResponseMessage } from "@shared/infra/decorators/response-message.decorator";
 import { ApiWrappedResponse } from "@shared/infra/swagger/api-response.dto";
 import { Public } from "@shared/infra/decorators/public.decorator";
@@ -37,6 +38,7 @@ export class AuthController {
 
   @Public()
   @Post("login")
+  @Throttle({ default: { ttl: 60_000, limit: 5 } })
   @ResponseMessage("Login efetuado com sucesso")
   @ApiWrappedResponse(AuthResponseDto, { description: "Login de usuário" })
   async login(@Body() dto: LoginDto) {
@@ -45,6 +47,7 @@ export class AuthController {
 
   @Public()
   @Post("forgot-password")
+  @Throttle({ default: { ttl: 600_000, limit: 3 } })
   @ResponseMessage("Solicitação processada")
   async forgotPassword(@Body() dto: ForgotPasswordDto) {
     return this.passwordRecoveryService.requestRecovery(dto.email);
@@ -70,6 +73,7 @@ export class AuthController {
 
   @Public()
   @Post("reactivation/request")
+  @Throttle({ default: { ttl: 600_000, limit: 3 } })
   @ApiOperation({ summary: "Solicitar reativação de conta desativada" })
   @ResponseMessage("Solicitação processada")
   async requestReactivation(@Body() dto: ReactivationRequestDto) {

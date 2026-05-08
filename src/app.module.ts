@@ -1,6 +1,7 @@
 import { Module } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
-import { APP_FILTER, APP_INTERCEPTOR } from "@nestjs/core";
+import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from "@nestjs/core";
+import { ThrottlerGuard, ThrottlerModule } from "@nestjs/throttler";
 import { validate } from "@shared/infra/config/env.validation";
 import { GlobalExceptionFilter } from "@shared/infra/filters/global-exception.filter";
 import { TransformInterceptor } from "@shared/infra/interceptors/transform.interceptor";
@@ -18,6 +19,7 @@ import { InstitutionsModule } from "./modules/institutions/institutions.module";
       envFilePath: `envs/.env.${process.env.NODE_ENV || "development"}`,
       validate,
     }),
+    ThrottlerModule.forRoot({ throttlers: [{ ttl: 60_000, limit: 30 }] }),
     SharedModule,
     LocationModule,
     UsersModule,
@@ -27,6 +29,7 @@ import { InstitutionsModule } from "./modules/institutions/institutions.module";
   providers: [
     { provide: APP_INTERCEPTOR, useClass: TransformInterceptor },
     { provide: APP_FILTER, useClass: GlobalExceptionFilter },
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
   ],
 })
 export class AppModule {}
