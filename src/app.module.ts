@@ -11,6 +11,7 @@ import { UsersModule } from "./modules/users/users.module";
 import { AuthModule } from "./modules/auth/auth.module";
 import { InstitutionsModule } from "./modules/institutions/institutions.module";
 import { CanteensModule } from "./modules/canteens/canteens.module";
+import { CategoriesModule } from "./modules/categories/categories.module";
 
 @Module({
   imports: [
@@ -27,6 +28,7 @@ import { CanteensModule } from "./modules/canteens/canteens.module";
     AuthModule,
     InstitutionsModule,
     CanteensModule,
+    CategoriesModule,
   ],
   providers: [
     { provide: APP_INTERCEPTOR, useClass: TransformInterceptor },
