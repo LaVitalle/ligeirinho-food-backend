@@ -1,9 +1,10 @@
 import { Injectable } from "@nestjs/common";
-import { eq } from "drizzle-orm";
+import { SQL, and, asc, count, desc, eq, ilike } from "drizzle-orm";
 import { PaginatedResult } from "@shared/application/dto/paginated-result";
 import { DrizzleService } from "@shared/infra/database/drizzle.service";
 import { Institution } from "../../domain/models/institution";
 import {
+  InstitutionListFilters,
   InstitutionRepository,
   InstitutionWithLocation,
 } from "../../domain/repositories/institution.repository";
@@ -48,8 +49,25 @@ export class DrizzleInstitutionRepository implements InstitutionRepository {
   async findAll(
     page: number,
     perPage: number,
+    filters?: InstitutionListFilters,
   ): Promise<PaginatedResult<InstitutionWithLocation>> {
     const offset = (page - 1) * perPage;
+
+    const conditions: SQL[] = [];
+    if (filters?.search) {
+      conditions.push(ilike(institutionsSchema.name, `%${filters.search}%`));
+    }
+    if (filters?.stateId) {
+      conditions.push(eq(institutionsSchema.stateId, filters.stateId));
+    }
+    if (filters?.cityId) {
+      conditions.push(eq(institutionsSchema.cityId, filters.cityId));
+    }
+
+    const orderBy =
+      filters?.sortBy === "createdAt"
+        ? desc(institutionsSchema.createdAt)
+        : asc(institutionsSchema.name);
 
     const rows = await this.drizzle.db
       .select({
@@ -60,7 +78,8 @@ export class DrizzleInstitutionRepository implements InstitutionRepository {
       .from(institutionsSchema)
       .leftJoin(statesSchema, eq(institutionsSchema.stateId, statesSchema.id))
       .leftJoin(citiesSchema, eq(institutionsSchema.cityId, citiesSchema.id))
-      .orderBy(institutionsSchema.name)
+      .where(conditions.length > 0 ? and(...conditions) : undefined)
+      .orderBy(orderBy)
       .limit(perPage + 1)
       .offset(offset);
 
@@ -80,6 +99,13 @@ export class DrizzleInstitutionRepository implements InstitutionRepository {
     }));
 
     return PaginatedResult.fromRows(mapped, page, perPage);
+  }
+
+  async count(): Promise<number> {
+    const [row] = await this.drizzle.db
+      .select({ total: count() })
+      .from(institutionsSchema);
+    return row.total;
   }
 
   async findById(id: string): Promise<InstitutionWithLocation | null> {

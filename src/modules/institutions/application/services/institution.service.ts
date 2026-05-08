@@ -9,6 +9,7 @@ import { PaginatedResult } from "@shared/application/dto/paginated-result";
 import { MinioService } from "@shared/infra/storage/minio.service";
 import {
   INSTITUTION_REPOSITORY,
+  InstitutionListFilters,
   InstitutionRepository,
 } from "../../domain/repositories/institution.repository";
 import { CreateInstitutionDto } from "../dto/create-institution.dto";
@@ -53,11 +54,17 @@ export class InstitutionService {
   async findAll(
     page: number,
     perPage: number,
+    filters?: InstitutionListFilters,
   ): Promise<PaginatedResult<InstitutionResponseDto>> {
-    const result = await this.institutionRepository.findAll(page, perPage);
+    const result = await this.institutionRepository.findAll(page, perPage, filters);
     return result.map((row) =>
       InstitutionResponseDto.from(row.institution, row.stateName, row.cityName),
     );
+  }
+
+  async count(): Promise<{ total: number }> {
+    const total = await this.institutionRepository.count();
+    return { total };
   }
 
   async findById(id: string): Promise<InstitutionResponseDto> {

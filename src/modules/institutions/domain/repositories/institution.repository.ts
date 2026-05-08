@@ -9,6 +9,13 @@ export interface InstitutionWithLocation {
   cityName: string | null;
 }
 
+export interface InstitutionListFilters {
+  search?: string;
+  stateId?: number;
+  cityId?: number;
+  sortBy?: "name" | "createdAt";
+}
+
 export interface InstitutionRepository {
   create(data: {
     name: string;
@@ -21,7 +28,10 @@ export interface InstitutionRepository {
   findAll(
     page: number,
     perPage: number,
+    filters?: InstitutionListFilters,
   ): Promise<PaginatedResult<InstitutionWithLocation>>;
+
+  count(): Promise<number>;
 
   findById(id: string): Promise<InstitutionWithLocation | null>;
 

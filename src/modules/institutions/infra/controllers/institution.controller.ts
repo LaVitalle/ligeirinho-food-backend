@@ -71,7 +71,7 @@ export class InstitutionController {
   @Get()
   @Roles(UserRole.ADMIN)
   @ApiBearerAuth()
-  @ApiOperation({ summary: "Lista instituições paginadas" })
+  @ApiOperation({ summary: "Lista instituições paginadas com filtros" })
   @ResponseMessage("Instituições listadas com sucesso")
   @ApiWrappedResponse(InstitutionResponseDto, {
     isArray: true,
@@ -80,8 +80,26 @@ export class InstitutionController {
   async findAll(
     @Query("page", new DefaultValuePipe(1), ParseIntPipe) page: number,
     @Query("perPage", new DefaultValuePipe(10), ParseIntPipe) perPage: number,
+    @Query("search") search?: string,
+    @Query("stateId") stateId?: string,
+    @Query("cityId") cityId?: string,
+    @Query("sortBy") sortBy?: string,
   ) {
-    return this.institutionService.findAll(page, perPage);
+    return this.institutionService.findAll(page, perPage, {
+      search,
+      stateId: stateId ? Number(stateId) : undefined,
+      cityId: cityId ? Number(cityId) : undefined,
+      sortBy: sortBy === "createdAt" ? "createdAt" : "name",
+    });
+  }
+
+  @Get("count")
+  @Roles(UserRole.ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: "Contagem total de instituições" })
+  @ResponseMessage("Contagem de instituições")
+  async count() {
+    return this.institutionService.count();
   }
 
   @Public()
