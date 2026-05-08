@@ -35,6 +35,27 @@ export function buildBaseEmail(title: string, contentHtml: string): string {
 </html>`;
 }
 
+export function buildAccountReactivationEmail(code: string): string {
+  const content = `
+    <p style="margin:0 0 16px 0;font-size:15px;line-height:1.6;color:#374151;">
+      Recebemos uma solicitação para reativar a sua conta. Use o código abaixo para confirmar. Este código é válido por <strong>15 minutos</strong>.
+    </p>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:24px 0;">
+      <tr>
+        <td align="center">
+          <div style="display:inline-block;padding:16px 32px;background-color:#FFF7ED;border:2px dashed #F97316;border-radius:12px;">
+            <span style="font-size:36px;font-weight:800;letter-spacing:12px;color:#EA580C;font-family:'Courier New',monospace;">${code}</span>
+          </div>
+        </td>
+      </tr>
+    </table>
+    <p style="margin:0 0 8px 0;font-size:14px;color:#6B7280;">
+      Se você não solicitou a reativação, ignore este email.
+    </p>
+  `;
+  return buildBaseEmail("Reativação de conta", content);
+}
+
 export function buildPasswordRecoveryEmail(code: string): string {
   const content = `
     <p style="margin:0 0 16px 0;font-size:15px;line-height:1.6;color:#374151;">

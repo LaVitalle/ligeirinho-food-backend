@@ -4,12 +4,17 @@ import {
   Injectable,
   Logger,
 } from "@nestjs/common";
+import { JwtService } from "@nestjs/jwt";
+import { UserDto } from "../../../users/application/dto/user.dto";
 import { randomInt } from "crypto";
 import bcrypt from "bcryptjs";
 import { and, eq, gt, sql } from "drizzle-orm";
 import { DrizzleService } from "@shared/infra/database/drizzle.service";
 import { EmailService } from "@shared/infra/email/email.service";
-import { buildPasswordRecoveryEmail } from "@shared/infra/email/templates/base-email.template";
+import {
+  buildPasswordRecoveryEmail,
+  buildAccountReactivationEmail,
+} from "@shared/infra/email/templates/base-email.template";
 import {
   USER_REPOSITORY,
   UserRepository,
@@ -30,6 +35,7 @@ export class PasswordRecoveryService {
     private readonly userRepository: UserRepository,
     private readonly drizzle: DrizzleService,
     private readonly emailService: EmailService,
+    private readonly jwtService: JwtService,
   ) {}
 
   async requestRecovery(email: string): Promise<{ message: string }> {
@@ -101,6 +107,105 @@ export class PasswordRecoveryService {
       .where(eq(passwordRecoverySchema.id, recovery.id));
 
     return { message: "Senha redefinida com sucesso." };
+  }
+
+  async requestReactivation(email: string): Promise<{ message: string }> {
+    const user = await this.userRepository.findByEmailIncludeDeleted(email);
+
+    if (!user || user.deletedAt === null) {
+      return { message: GENERIC_RESPONSE_MESSAGE };
+    }
+
+    const activeUser = await this.userRepository.findByEmail(email);
+    if (activeUser) {
+      return { message: GENERIC_RESPONSE_MESSAGE };
+    }
+
+    await this.drizzle.db
+      .update(passwordRecoverySchema)
+      .set({ isUsed: true })
+      .where(
+        and(
+          eq(passwordRecoverySchema.userId, user.id),
+          eq(passwordRecoverySchema.isUsed, false),
+        ),
+      );
+
+    const code = this.generateCode();
+    const expiresAt = new Date(Date.now() + RECOVERY_TTL_MINUTES * 60 * 1000);
+
+    await this.drizzle.db.insert(passwordRecoverySchema).values({
+      userId: user.id,
+      code,
+      expiresAt,
+      isUsed: false,
+    });
+
+    try {
+      await this.emailService.sendEmail(
+        user.email,
+        "Ligeirinho Food — Reativação de conta",
+        buildAccountReactivationEmail(code),
+      );
+    } catch (error) {
+      this.logger.error(
+        `Falha ao enviar email de reativação para ${user.email}`,
+        (error as Error).stack,
+      );
+    }
+
+    return { message: GENERIC_RESPONSE_MESSAGE };
+  }
+
+  async confirmReactivation(
+    email: string,
+    code: string,
+  ): Promise<{ accessToken: string; user: UserDto }> {
+    const user = await this.userRepository.findByEmailIncludeDeleted(email);
+    if (!user || user.deletedAt === null) {
+      throw new BadRequestException("Código inválido ou expirado.");
+    }
+
+    const rows = await this.drizzle.db
+      .select({
+        id: passwordRecoverySchema.id,
+        userId: passwordRecoverySchema.userId,
+      })
+      .from(passwordRecoverySchema)
+      .where(
+        and(
+          eq(passwordRecoverySchema.userId, user.id),
+          eq(passwordRecoverySchema.code, code),
+          eq(passwordRecoverySchema.isUsed, false),
+          gt(passwordRecoverySchema.expiresAt, sql`now()`),
+        ),
+      )
+      .limit(1);
+
+    const row = rows[0];
+    if (!row) {
+      throw new BadRequestException("Código inválido ou expirado.");
+    }
+
+    await this.drizzle.db
+      .update(usersSchema)
+      .set({ deletedAt: null, updatedAt: new Date() })
+      .where(eq(usersSchema.id, user.id));
+
+    await this.drizzle.db
+      .update(passwordRecoverySchema)
+      .set({ isUsed: true })
+      .where(eq(passwordRecoverySchema.id, row.id));
+
+    const reactivated = await this.userRepository.findByEmail(email);
+    const payload = {
+      sub: reactivated!.id,
+      email: reactivated!.email,
+      role: reactivated!.role,
+    };
+    const accessToken = await this.jwtService.signAsync(payload);
+
+    return { accessToken, user: UserDto.from(reactivated!)! };
   }
 
   private async assertCodeIsValid(

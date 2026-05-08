@@ -8,6 +8,8 @@ import { LoginDto } from "../../application/dto/login.dto";
 import { ForgotPasswordDto } from "../../application/dto/forgot-password.dto";
 import { VerifyCodeDto } from "../../application/dto/verify-code.dto";
 import { ResetPasswordDto } from "../../application/dto/reset-password.dto";
+import { ReactivationRequestDto } from "../../application/dto/reactivation-request.dto";
+import { ReactivationConfirmDto } from "../../application/dto/reactivation-confirm.dto";
 import { AuthResponseDto } from "../../application/dto/auth-response.dto";
 import { AuthService } from "../../application/services/auth.service";
 import { PasswordRecoveryService } from "../../application/services/password-recovery.service";
@@ -63,6 +65,26 @@ export class AuthController {
       dto.email,
       dto.code,
       dto.newPassword,
+    );
+  }
+
+  @Public()
+  @Post("reactivation/request")
+  @ApiOperation({ summary: "Solicitar reativação de conta desativada" })
+  @ResponseMessage("Solicitação processada")
+  async requestReactivation(@Body() dto: ReactivationRequestDto) {
+    return this.passwordRecoveryService.requestReactivation(dto.email);
+  }
+
+  @Public()
+  @Post("reactivation/confirm")
+  @ApiOperation({ summary: "Confirmar reativação de conta com código" })
+  @ResponseMessage("Conta reativada com sucesso")
+  @ApiWrappedResponse(AuthResponseDto, { description: "Conta reativada" })
+  async confirmReactivation(@Body() dto: ReactivationConfirmDto) {
+    return this.passwordRecoveryService.confirmReactivation(
+      dto.email,
+      dto.code,
     );
   }
 }
