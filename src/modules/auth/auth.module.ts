@@ -1,4 +1,4 @@
-import { Module } from "@nestjs/common";
+import { Module, forwardRef } from "@nestjs/common";
 import { APP_GUARD } from "@nestjs/core";
 import { JwtModule } from "@nestjs/jwt";
 import { ConfigModule, ConfigService } from "@nestjs/config";
@@ -25,7 +25,7 @@ import { JwtStrategy } from "./infra/strategies/jwt.strategy";
       }),
     }),
     SharedModule,
-    UsersModule,
+    forwardRef(() => UsersModule),
     InstitutionsModule,
     EmailModule,
   ],
@@ -37,5 +37,6 @@ import { JwtStrategy } from "./infra/strategies/jwt.strategy";
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: RolesGuard },
   ],
+  exports: [PasswordRecoveryService],
 })
 export class AuthModule {}
