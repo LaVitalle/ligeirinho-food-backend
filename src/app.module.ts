@@ -15,6 +15,7 @@ import { CategoriesModule } from "./modules/categories/categories.module";
 import { ProductsModule } from "./modules/products/products.module";
 import { ExtrasModule } from "./modules/extras/extras.module";
 import { CartModule } from "./modules/cart/cart.module";
+import { OrdersModule } from "./modules/orders/orders.module";
 
 @Module({
   imports: [
@@ -35,6 +36,7 @@ import { CartModule } from "./modules/cart/cart.module";
     ProductsModule,
     ExtrasModule,
     CartModule,
+    OrdersModule,
   ],
   providers: [
     { provide: APP_INTERCEPTOR, useClass: TransformInterceptor },
