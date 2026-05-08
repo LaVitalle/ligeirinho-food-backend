@@ -10,6 +10,7 @@ import { LocationModule } from "./modules/location/location.module";
 import { UsersModule } from "./modules/users/users.module";
 import { AuthModule } from "./modules/auth/auth.module";
 import { InstitutionsModule } from "./modules/institutions/institutions.module";
+import { CanteensModule } from "./modules/canteens/canteens.module";
 
 @Module({
   imports: [
@@ -25,6 +26,7 @@ import { InstitutionsModule } from "./modules/institutions/institutions.module";
     UsersModule,
     AuthModule,
     InstitutionsModule,
+    CanteensModule,
   ],
   providers: [
     { provide: APP_INTERCEPTOR, useClass: TransformInterceptor },
