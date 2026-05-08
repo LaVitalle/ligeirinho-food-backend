@@ -6,7 +6,11 @@
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
 -- User access levels
-CREATE TYPE user_role AS ENUM ('ADMIN', 'SELLER', 'CUSTOMER');
+-- ADMIN              : administrador global da plataforma (sem instituição vinculada)
+-- INSTITUTION_ADMIN  : administra UMA instituição (cria cantinas dela). Não cria outros admins.
+-- SELLER             : vendedor exclusivo de UMA cantina (1:1). Criado junto da cantina.
+-- CUSTOMER           : cliente final, vinculado a uma instituição via access_code.
+CREATE TYPE user_role AS ENUM ('ADMIN', 'INSTITUTION_ADMIN', 'SELLER', 'CUSTOMER');
 
 -- Measurement units for extras
 CREATE TYPE measurement_unit AS ENUM ('UNIT', 'GRAMS', 'ML');
@@ -111,23 +115,31 @@ CREATE TRIGGER trg_update_canteens_updated_at
 CREATE TABLE users (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     full_name VARCHAR(100) NOT NULL,
-    email VARCHAR(255) UNIQUE NOT NULL,
+    email VARCHAR(255) NOT NULL, -- Único entre usuários ATIVOS (ver índice parcial abaixo)
     password_hash TEXT NOT NULL,
     phone_number VARCHAR(20),
     profile_photo_url TEXT,
     role user_role NOT NULL,
-    institution_id UUID REFERENCES institutions(id), -- Null para Admins Globais
-    canteen_id UUID REFERENCES canteens(id), -- Vinculado apenas para Vendedores
+    institution_id UUID REFERENCES institutions(id), -- Null apenas para ADMIN global
+    canteen_id UUID REFERENCES canteens(id), -- Não-nulo apenas para SELLER
+    deleted_at TIMESTAMP WITH TIME ZONE, -- Soft delete; NULL = conta ativa
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
 
-    -- Garante que Vendedores têm sempre cantina vinculada
-    CONSTRAINT check_seller_has_canteen CHECK (
-        (role = 'SELLER' AND canteen_id IS NOT NULL) OR (role <> 'SELLER')
+    -- Coerência entre role e vínculos institucionais/cantina
+    CONSTRAINT check_user_role_consistency CHECK (
+        (role = 'ADMIN'             AND institution_id IS NULL     AND canteen_id IS NULL) OR
+        (role = 'INSTITUTION_ADMIN' AND institution_id IS NOT NULL AND canteen_id IS NULL) OR
+        (role = 'CUSTOMER'          AND institution_id IS NOT NULL AND canteen_id IS NULL) OR
+        (role = 'SELLER'            AND institution_id IS NOT NULL AND canteen_id IS NOT NULL)
     )
 );
 
-CREATE TRIGGER trg_update_users_updated_at 
+-- Email único apenas entre contas ativas — permite reuso após soft delete
+CREATE UNIQUE INDEX idx_users_email_unique_active
+    ON users(email) WHERE deleted_at IS NULL;
+
+CREATE TRIGGER trg_update_users_updated_at
     BEFORE UPDATE ON users FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
 
 -- ==========================================================

@@ -42,4 +42,17 @@ export class PaginatedResult<T> {
     const items = hasNextPage ? rows.slice(0, perPage) : rows;
     return new PaginatedResult(items, page, perPage, hasNextPage);
   }
+
+  /**
+   * Retorna um novo PaginatedResult aplicando a função de transformação
+   * em cada item, preservando page/perPage/hasNextPage.
+   */
+  map<U>(fn: (item: T) => U): PaginatedResult<U> {
+    return new PaginatedResult(
+      this.items.map(fn),
+      this.page,
+      this.perPage,
+      this.hasNextPage,
+    );
+  }
 }

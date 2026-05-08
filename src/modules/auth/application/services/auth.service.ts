@@ -1,11 +1,17 @@
 import {
   ConflictException,
+  ForbiddenException,
+  Inject,
   Injectable,
+  NotFoundException,
   UnauthorizedException,
 } from "@nestjs/common";
-import { Inject } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
 import { UserRole } from "@shared/domain/enums/user-role.enum";
+import {
+  INSTITUTION_REPOSITORY,
+  InstitutionRepository,
+} from "../../../institutions/domain/repositories/institution.repository";
 import { USER_REPOSITORY, UserRepository } from "../../../users/domain/repositories/user.repository";
 import { UserDto } from "../../../users/application/dto/user.dto";
 import { RegisterDto } from "../dto/register.dto";
@@ -17,17 +23,20 @@ export class AuthService {
   constructor(
     @Inject(USER_REPOSITORY)
     private readonly userRepository: UserRepository,
+    @Inject(INSTITUTION_REPOSITORY)
+    private readonly institutionRepository: InstitutionRepository,
     private readonly jwtService: JwtService,
   ) {}
 
   async register(dto: RegisterDto): Promise<{ accessToken: string; user: UserDto }> {
+    const institution = await this.institutionRepository.findByAccessCode(dto.accessCode);
+    if (!institution) {
+      throw new NotFoundException("Código de acesso inválido");
+    }
+
     const exists = await this.userRepository.findByEmail(dto.email);
     if (exists) {
       throw new ConflictException("Já existe um usuário com esse email");
-    }
-
-    if (dto.role === UserRole.SELLER && !dto.canteenId) {
-      throw new ConflictException("Vendedores devem estar vinculados a uma cantina");
     }
 
     const passwordHash = await bcrypt.hash(dto.password, 10);
@@ -38,25 +47,34 @@ export class AuthService {
       passwordHash,
       phoneNumber: dto.phoneNumber ?? null,
       profilePhotoUrl: null,
-      role: dto.role,
-      institutionId: dto.institutionId ?? null,
-      canteenId: dto.canteenId ?? null,
+      role: UserRole.CUSTOMER,
+      institutionId: institution.id,
+      canteenId: null,
     });
 
     const payload = { sub: user.id, email: user.email, role: user.role };
     const accessToken = await this.jwtService.signAsync(payload);
 
     return { accessToken, user: UserDto.from(user)! };
-    }
+  }
 
   async login(dto: LoginDto): Promise<{ accessToken: string; user: UserDto }> {
-    const user = await this.userRepository.findByEmail(dto.email);
+    const user = await this.userRepository.findByEmailIncludeDeleted(dto.email);
     if (!user) {
       throw new UnauthorizedException("Credenciais inválidas");
     }
+
     const valid = await bcrypt.compare(dto.password, user.passwordHash);
     if (!valid) {
       throw new UnauthorizedException("Credenciais inválidas");
+    }
+
+    if (user.deletedAt !== null) {
+      throw new ForbiddenException({
+        code: "ACCOUNT_DEACTIVATED",
+        message:
+          "Sua conta está desativada. Use a recuperação de senha ou solicite reativação.",
+      });
     }
 
     const payload = { sub: user.id, email: user.email, role: user.role };
@@ -64,4 +82,3 @@ export class AuthService {
     return { accessToken, user: UserDto.from(user)! };
   }
 }
-

@@ -1,10 +1,11 @@
 import { Injectable } from "@nestjs/common";
+import { SQL, and, asc, eq, ilike, isNull, or } from "drizzle-orm";
+import { PaginatedResult } from "@shared/application/dto/paginated-result";
 import { DrizzleService } from "@shared/infra/database/drizzle.service";
 import { UserRole } from "@shared/domain/enums/user-role.enum";
 import { User } from "../../domain/models/user";
-import { UserRepository } from "../../domain/repositories/user.repository";
+import { UserListFilters, UserRepository } from "../../domain/repositories/user.repository";
 import { usersSchema } from "../schemas/user.schema";
-import { eq } from "drizzle-orm";
 
 @Injectable()
 export class DrizzleUserRepository implements UserRepository {
@@ -30,11 +31,39 @@ export class DrizzleUserRepository implements UserRepository {
         canteenId: row.canteenId ?? null,
         createdAt: row.createdAt as unknown as Date,
         updatedAt: row.updatedAt as unknown as Date,
+        deletedAt: row.deletedAt as unknown as Date | null,
       },
     );
   }
 
   async findByEmail(email: string): Promise<User | null> {
+    const rows = await this.drizzle.db
+      .select()
+      .from(usersSchema)
+      .where(
+        and(eq(usersSchema.email, email), isNull(usersSchema.deletedAt)),
+      )
+      .limit(1);
+    const row = rows[0];
+    return User.restore(
+      row && {
+        id: row.id,
+        fullName: row.fullName,
+        email: row.email,
+        passwordHash: row.passwordHash,
+        phoneNumber: row.phoneNumber ?? null,
+        profilePhotoUrl: row.profilePhotoUrl ?? null,
+        role: row.role as UserRole,
+        institutionId: row.institutionId ?? null,
+        canteenId: row.canteenId ?? null,
+        createdAt: row.createdAt as unknown as Date,
+        updatedAt: row.updatedAt as unknown as Date,
+        deletedAt: row.deletedAt as unknown as Date | null,
+      },
+    );
+  }
+
+  async findByEmailIncludeDeleted(email: string): Promise<User | null> {
     const rows = await this.drizzle.db
       .select()
       .from(usersSchema)
@@ -54,6 +83,7 @@ export class DrizzleUserRepository implements UserRepository {
         canteenId: row.canteenId ?? null,
         createdAt: row.createdAt as unknown as Date,
         updatedAt: row.updatedAt as unknown as Date,
+        deletedAt: row.deletedAt as unknown as Date | null,
       },
     );
   }
@@ -94,6 +124,94 @@ export class DrizzleUserRepository implements UserRepository {
       canteenId: row.canteenId ?? null,
       createdAt: row.createdAt as unknown as Date,
       updatedAt: row.updatedAt as unknown as Date,
+      deletedAt: null,
     })!;
+  }
+
+  async update(
+    id: string,
+    data: Partial<{
+      fullName: string;
+      passwordHash: string;
+      phoneNumber: string | null;
+      profilePhotoUrl: string | null;
+      deletedAt: Date | null;
+    }>,
+  ): Promise<User> {
+    const [row] = await this.drizzle.db
+      .update(usersSchema)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(usersSchema.id, id))
+      .returning();
+
+    return User.restore({
+      id: row.id,
+      fullName: row.fullName,
+      email: row.email,
+      passwordHash: row.passwordHash,
+      phoneNumber: row.phoneNumber ?? null,
+      profilePhotoUrl: row.profilePhotoUrl ?? null,
+      role: row.role as UserRole,
+      institutionId: row.institutionId ?? null,
+      canteenId: row.canteenId ?? null,
+      createdAt: row.createdAt as unknown as Date,
+      updatedAt: row.updatedAt as unknown as Date,
+      deletedAt: row.deletedAt as unknown as Date | null,
+    })!;
+  }
+
+  async findAll(
+    page: number,
+    perPage: number,
+    filters?: UserListFilters,
+  ): Promise<PaginatedResult<User>> {
+    const offset = (page - 1) * perPage;
+    const conditions: SQL[] = [];
+
+    if (filters?.onlyActive !== false) {
+      conditions.push(isNull(usersSchema.deletedAt));
+    }
+    if (filters?.role) {
+      conditions.push(eq(usersSchema.role, filters.role));
+    }
+    if (filters?.institutionId) {
+      conditions.push(eq(usersSchema.institutionId, filters.institutionId));
+    }
+    if (filters?.search) {
+      conditions.push(
+        or(
+          ilike(usersSchema.fullName, `%${filters.search}%`),
+          ilike(usersSchema.email, `%${filters.search}%`),
+        )!,
+      );
+    }
+
+    const rows = await this.drizzle.db
+      .select()
+      .from(usersSchema)
+      .where(conditions.length > 0 ? and(...conditions) : undefined)
+      .orderBy(asc(usersSchema.fullName))
+      .limit(perPage + 1)
+      .offset(offset);
+
+    const users = rows.map(
+      (row) =>
+        User.restore({
+          id: row.id,
+          fullName: row.fullName,
+          email: row.email,
+          passwordHash: row.passwordHash,
+          phoneNumber: row.phoneNumber ?? null,
+          profilePhotoUrl: row.profilePhotoUrl ?? null,
+          role: row.role as UserRole,
+          institutionId: row.institutionId ?? null,
+          canteenId: row.canteenId ?? null,
+          createdAt: row.createdAt as unknown as Date,
+          updatedAt: row.updatedAt as unknown as Date,
+          deletedAt: row.deletedAt as unknown as Date | null,
+        })!,
+    );
+
+    return PaginatedResult.fromRows(users, page, perPage);
   }
 }

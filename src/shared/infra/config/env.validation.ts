@@ -40,6 +40,26 @@ export class EnvironmentVariables {
   @IsBoolean()
   @IsOptional()
   SWAGGER_ENABLED: boolean = true;
+
+  @IsString()
+  @IsNotEmpty({ message: "SMTP_HOST is required" })
+  SMTP_HOST: string;
+
+  @IsNumber()
+  @IsOptional()
+  SMTP_PORT: number = 587;
+
+  @IsString()
+  @IsNotEmpty({ message: "SMTP_USER is required" })
+  SMTP_USER: string;
+
+  @IsString()
+  @IsNotEmpty({ message: "SMTP_PASS is required" })
+  SMTP_PASS: string;
+
+  @IsString()
+  @IsOptional()
+  SMTP_FROM?: string;
 }
 
 export function validate(
