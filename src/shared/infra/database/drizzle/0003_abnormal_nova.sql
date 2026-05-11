@@ -1,4 +1,3 @@
-ALTER TYPE "public"."user_role" ADD VALUE IF NOT EXISTS 'INSTITUTION_ADMIN' BEFORE 'SELLER';--> statement-breakpoint
 ALTER TABLE "users" DROP CONSTRAINT IF EXISTS "users_email_unique";--> statement-breakpoint
 ALTER TABLE "users" DROP CONSTRAINT IF EXISTS "check_seller_has_canteen";--> statement-breakpoint
 ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "deleted_at" timestamp with time zone;--> statement-breakpoint

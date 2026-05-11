@@ -47,8 +47,9 @@ COPY --chown=nestjs:nodejs --from=build /app/dist ./dist
 # Copy Drizzle SQL migration files
 COPY --chown=nestjs:nodejs --from=build /app/src/shared/infra/database/drizzle ./migrations
 
-# Copy migration runner and entrypoint
+# Copy migration runner, pre-migrate and entrypoint
 COPY --chown=nestjs:nodejs scripts/migrate.js ./scripts/migrate.js
+COPY --chown=nestjs:nodejs scripts/pre-migrate.js ./scripts/pre-migrate.js
 COPY --chown=nestjs:nodejs docker-entrypoint.sh ./
 RUN chmod +x docker-entrypoint.sh
 
