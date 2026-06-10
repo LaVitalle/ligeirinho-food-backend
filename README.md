@@ -1,8 +1,51 @@
-# Ligeirinho Food — Backend API
+# Ligeirinho Food — Backend (Microsserviços)
 
-API REST para o **Ligeirinho Food**, um sistema de delivery de alimentos desenvolvido como Projeto Integrador do 5° semestre.
+Sistema de delivery de alimentos para instituições (Projeto Integrador do 5° semestre), rearquitetado como **microsserviços NestJS** com comunicação **assíncrona via RabbitMQ**, **um banco PostgreSQL por serviço** e **API Gateway** único na frente.
 
-Construído com **NestJS** seguindo **Clean Architecture + DDD**, organizado como **Modular Monolith**.
+Este repositório é o **monorepo de desenvolvimento**. Cada serviço é autossuficiente e, para deploy, vai para o seu próprio repositório (ver [Split & Deploy](#split--deploy)).
+
+## Arquitetura
+
+```
+                    ┌─────────────────────┐
+  Frontend ─HTTP──▶ │  gateway   :4000    │  (1 base URL · agrega /docs)
+                    └───┬───────┬─────────┘
+            /auth /users│ /...  │ /cart /orders ...
+        /institutions   │       │
+        ┌───────────────▼─┐ ┌───▼──────────┐ ┌──────────────┐
+        │ identity :4001  │ │ catalog :4002│ │ orders :4003 │
+        │ auth · users    │ │ canteens     │ │ cart · orders│
+        │ institutions    │ │ categories   │ │ ratings      │
+        │ location · email│ │ products     │ │ reports      │
+        └──────┬──────────┘ │ extras       │ └──────┬───────┘
+        ligeirinho_identity └───┬──────────┘   ligeirinho_orders
+          (Postgres)        ligeirinho_catalog   (Postgres)
+                │            (Postgres)              │
+                └───────────────┬────────────────────┘
+                          ┌─────▼──────┐
+                          │  RabbitMQ  │  (exchanges direct, 1 por evento)
+                          └────────────┘
+```
+
+| Serviço | Porta | Banco | Responsabilidade |
+|---|---|---|---|
+| `gateway` | 4000 | — | Reverse proxy + Swagger agregado (entrada única) |
+| `identity` | 4001 | `ligeirinho_identity` | Autenticação, usuários, instituições, localização, e-mail |
+| `catalog` | 4002 | `ligeirinho_catalog` | Cantinas, categorias, produtos, adicionais (MinIO) |
+| `orders` | 4003 | `ligeirinho_orders` | Carrinho, pedidos, avaliações, relatórios |
+
+### Comunicação assíncrona (RabbitMQ)
+
+| Evento (routing key) | Publica | Consome | Efeito |
+|---|---|---|---|
+| `canteen.created` | catalog | identity | identity cria o SELLER (1:1) e publica `seller.created` |
+| `seller.created` | identity | catalog | catalog grava `canteen.seller_id` |
+| `canteen.updated` | catalog | orders | projeção local `canteens_view` |
+| `product.upserted` / `product.deleted` | catalog | orders | projeção local `products_view` |
+| `order.created` | orders | identity | e-mail de confirmação ao cliente |
+| `order.status_changed` | orders | identity | e-mail de atualização de status |
+
+> **Sem compartilhamento de banco**: o orders nunca lê o banco do catalog — ele mantém cópias read-only (`products_view`, `canteens_view`) alimentadas por eventos (consistência eventual).
 
 ## Stack
 
@@ -10,133 +53,103 @@ Construído com **NestJS** seguindo **Clean Architecture + DDD**, organizado com
 |---|---|
 | NestJS 11 | Framework HTTP |
 | TypeScript | Linguagem |
-| PostgreSQL 17 | Banco de dados |
+| PostgreSQL 17 | Banco (um por serviço) |
 | Drizzle ORM | ORM e migrations |
-| MinIO | Armazenamento de objetos (imagens) |
-| JWT + bcrypt | Autenticação |
+| RabbitMQ (amqplib) | Mensageria assíncrona |
+| MinIO | Objetos/imagens (catalog) |
+| JWT + bcrypt | Autenticação (stateless nos serviços) |
+| Swagger / OpenAPI + HATEOAS | Documentação e hipermídia |
 
 ## Pré-requisitos
 
-- [Node.js](https://nodejs.org/) >= 20
-- [Docker](https://www.docker.com/) e [Docker Compose](https://docs.docker.com/compose/) (para ambiente de desenvolvimento)
+- [Docker](https://www.docker.com/) + Docker Compose (sobe tudo)
+- [Node.js](https://nodejs.org/) >= 20 (apenas para rodar serviços fora do Docker)
 
-## Configuração
-
-1. Clone o repositório:
+## Subir tudo (recomendado)
 
 ```bash
-git clone <url-do-repositorio>
-cd ligeirinho-food-backend
+docker compose up -d --build
 ```
 
-2. Instale as dependências:
+Sobe Postgres (com os 3 bancos), RabbitMQ, MinIO, Adminer e os 4 serviços. As migrations rodam no boot de cada serviço.
+
+| Recurso | URL |
+|---|---|
+| Gateway (entrada única) | http://localhost:4000 |
+| Swagger identity | http://localhost:4000/identity/docs · http://localhost:4001/docs |
+| Swagger catalog | http://localhost:4000/catalog/docs · http://localhost:4002/docs |
+| Swagger orders | http://localhost:4000/orders/docs · http://localhost:4003/docs |
+| RabbitMQ Management | http://localhost:15672 (ligeirinho/ligeirinho) |
+| Adminer (DB UI) | http://localhost:8080 |
+| MinIO Console | http://localhost:9001 |
+
+Seed do admin (identity):
 
 ```bash
+docker compose exec identity npm run db:seed:admin
+docker compose exec identity npm run db:seed:location
+```
+
+Parar / limpar:
+
+```bash
+docker compose down       # para os containers
+docker compose down -v    # para e apaga os volumes (dados)
+```
+
+## Desenvolvimento por serviço (sem Docker)
+
+```bash
+cd services/identity        # (ou catalog / orders / gateway)
+cp .env.example .env        # ajuste as variáveis
 npm install
+npm run db:migrate          # serviços de domínio
+npm run start:dev
 ```
 
-3. Crie o arquivo de variáveis de ambiente a partir do exemplo:
+## Código compartilhado (shared)
+
+A fonte canônica fica em [`shared/src`](shared/src) (envelope de resposta + HATEOAS, guards, mensageria, contratos de eventos, etc.). Ela é **vendorizada** em cada serviço (`services/<svc>/src/shared`) por:
 
 ```bash
-mkdir -p envs
-cp .env.example envs/.env.development
+npm run shared:sync
 ```
 
-Edite `envs/.env.development` conforme necessário. Para produção, crie `envs/.env.production` com as credenciais reais.
+Edite sempre em `shared/src` e rode o sync — nunca edite as cópias dentro dos serviços.
 
-## Desenvolvimento
+## Split & Deploy
 
-### 1. Subir os serviços (PostgreSQL + MinIO)
+Cada serviço é deployado a partir do seu **próprio repositório GitHub** (App no EasyPanel, build por Dockerfile). Para publicar:
 
 ```bash
-docker compose up -d
+export REPO_GATEWAY=git@github.com:voce/ligeirinho-gateway.git
+export REPO_IDENTITY=git@github.com:voce/ligeirinho-identity.git
+export REPO_CATALOG=git@github.com:voce/ligeirinho-catalog.git
+export REPO_ORDERS=git@github.com:voce/ligeirinho-orders.git
+npm run split
 ```
 
-Isso cria automaticamente:
+No EasyPanel: 1 RabbitMQ + 3 Postgres + (1 MinIO) + 4 Apps. O `JWT_SECRET` deve ser **idêntico** em identity/catalog/orders (verificação stateless). Detalhes no plano de migração e em [`docs/arquitetura.md`](docs/arquitetura.md).
 
-| Serviço | Porta | Descrição |
-|---|---|---|
-| PostgreSQL | `5432` | Banco de dados |
-| MinIO API | `9000` | Armazenamento de objetos |
-| MinIO Console | `9001` | Painel web do MinIO |
+## Contrato de resposta
 
-O bucket `ligeirinho` é criado automaticamente na inicialização.
+Todas as respostas seguem o envelope padrão; endpoints com hipermídia trazem `_links`:
 
-### 2. Rodar a aplicação
+```json
+{
+  "data": { "id": "...", "_links": { "self": { "href": "/products/1", "method": "GET" } } },
+  "status": { "code": 200, "message": "Mensagem amigável" },
+  "pagination": {}
+}
+```
+
+## Scripts do monorepo
 
 ```bash
-npm run dev
+npm run shared:sync     # vendoriza shared/src nos serviços
+npm run install:all     # npm install em todos os serviços
+npm run typecheck:all   # tsc --noEmit em todos os serviços
+npm run compose:up      # docker compose up -d --build
+npm run compose:down    # docker compose down
+npm run split           # publica cada serviço no seu repo (ver acima)
 ```
-
-A API estará disponível em `http://localhost:3000`.
-
-### Outros comandos de desenvolvimento
-
-```bash
-npm run dev:debug    # modo watch + debugger (porta 9229)
-npm run db:generate  # gerar migrations do Drizzle
-npm run db:migrate   # aplicar migrations
-npm run db:push      # push direto no banco (sem migration)
-npm run db:studio    # abrir Drizzle Studio
-```
-
-### Parar os serviços
-
-```bash
-docker compose down       # para e remove os containers
-docker compose down -v    # para, remove containers e apaga os volumes (dados)
-```
-
-## Produção
-
-1. Configure `envs/.env.production` com as variáveis de ambiente de produção (veja `.env.example` para referência).
-
-2. Build e execução:
-
-```bash
-npm run build
-npm run start:prod
-```
-
-## Variáveis de ambiente
-
-| Variável | Descrição | Obrigatória |
-|---|---|---|
-| `PORT` | Porta da aplicação | Não (padrão: `3000`) |
-| `DATABASE_URL` | Connection string do PostgreSQL | Sim |
-| `JWT_SECRET` | Chave secreta para tokens JWT | Sim |
-| `MINIO_SERVER_URL` | URL do servidor MinIO | Sim |
-| `MINIO_ROOT_USER` | Usuário do MinIO | Sim |
-| `MINIO_ROOT_PASSWORD` | Senha do MinIO | Sim |
-| `MINIO_BUCKET` | Nome do bucket no MinIO | Sim |
-
-A aplicação valida todas as variáveis obrigatórias na inicialização. Se alguma estiver ausente, o processo encerra imediatamente com uma mensagem de erro descritiva.
-
-## Estrutura do Projeto
-
-```
-src/
-├── app.module.ts
-├── main.ts
-├── shared/                        ← infraestrutura compartilhada
-│   ├── shared.module.ts
-│   ├── domain/enums/
-│   └── infra/
-│       ├── config/                ← validação de variáveis de ambiente
-│       ├── database/drizzle/      ← migrations geradas
-│       └── decorators/
-└── modules/                       ← feature modules
-    └── <modulo>/
-        ├── domain/
-        │   ├── models/            ← entidades de domínio
-        │   └── repositories/      ← interfaces (contratos)
-        ├── application/
-        │   ├── services/          ← casos de uso
-        │   └── dto/               ← objetos de transferência
-        └── infra/
-            ├── controllers/       ← endpoints HTTP
-            ├── repositories/      ← implementações com Drizzle
-            └── schemas/           ← definições de tabelas
-```
-
-Cada módulo segue o padrão de 3 camadas (domain → application → infra), isolando regras de negócio do framework e do banco de dados. Detalhes completos em [`docs/arquitetura.md`](docs/arquitetura.md).

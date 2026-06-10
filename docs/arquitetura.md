@@ -1,6 +1,8 @@
 # Arquitetura do Projeto
 
-API REST com **NestJS** seguindo **Clean Architecture + DDD**, organizada como **Modular Monolith**.
+> ⚠️ **Atualização (microsserviços):** o projeto evoluiu de Modular Monolith para **microsserviços** (`identity`, `catalog`, `orders` + `gateway`), com **RabbitMQ**, **um banco por serviço** e **HATEOAS**. A visão geral, a topologia e o mapa de eventos estão em [`CLAUDE.md` §4](../CLAUDE.md) e no [`README.md`](../README.md). Os princípios de **Clean Architecture + DDD por camadas** abaixo continuam valendo **dentro de cada serviço**.
+
+API REST com **NestJS** seguindo **Clean Architecture + DDD** (aplicado por serviço).
 
 ## Stack
 

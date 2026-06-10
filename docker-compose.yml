@@ -1,19 +1,56 @@
+x-app-defaults: &app-defaults
+  restart: unless-stopped
+  networks:
+    - ligeirinho
+
 services:
+  # ───────────────────────── Infraestrutura ─────────────────────────
   postgres:
     image: postgres:17-alpine
     container_name: ligeirinho-postgres
-    ports:
-      - "5432:5432"
+    restart: unless-stopped
     environment:
       POSTGRES_USER: ligeirinho
       POSTGRES_PASSWORD: ligeirinho
-      POSTGRES_DB: ligeirinho_food
+      POSTGRES_DB: ligeirinho
+    ports:
+      - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+      - ./docker/postgres/init/01-create-databases.sql:/docker-entrypoint-initdb.d/01-create-databases.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ligeirinho -d ligeirinho"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    networks:
+      - ligeirinho
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: ligeirinho-rabbitmq
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: ligeirinho
+      RABBITMQ_DEFAULT_PASS: ligeirinho
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - rabbitmqdata:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      start_period: 30s
+      timeout: 20s
+      retries: 12
+    networks:
+      - ligeirinho
 
   minio:
     image: minio/minio:latest
     container_name: ligeirinho-minio
+    restart: unless-stopped
     ports:
       - "9000:9000"
       - "9001:9001"
@@ -23,6 +60,8 @@ services:
     volumes:
       - miniodata:/data
     command: server /data --console-address ":9001"
+    networks:
+      - ligeirinho
 
   minio-init:
     image: minio/mc:latest
@@ -37,7 +76,118 @@ services:
         mc anonymous set download local/ligeirinho;
         echo 'Bucket ligeirinho pronto (leitura publica)';
       "
+    networks:
+      - ligeirinho
+
+  adminer:
+    image: adminer:4.8.1-standalone
+    container_name: ligeirinho-adminer
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      ADMINER_DEFAULT_SERVER: postgres
+    ports:
+      - "8080:8080"
+    networks:
+      - ligeirinho
+
+  # ───────────────────────── Microsserviços ─────────────────────────
+  identity:
+    <<: *app-defaults
+    container_name: ligeirinho-identity
+    build:
+      context: ./services/identity
+    environment:
+      PORT: 4001
+      DATABASE_URL: postgres://ligeirinho:ligeirinho@postgres:5432/ligeirinho_identity
+      JWT_SECRET: super-secret-troque-isto
+      RABBITMQ_URL: amqp://ligeirinho:ligeirinho@rabbitmq:5672
+      SWAGGER_ENABLED: "true"
+      MINIO_SERVER_URL: http://minio:9000
+      MINIO_ROOT_USER: ligeirinho-admin
+      MINIO_ROOT_PASSWORD: ligeirinho-dev-2026
+      MINIO_BUCKET: ligeirinho
+      SMTP_HOST: ${SMTP_HOST:-smtp.example.com}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-usuario}
+      SMTP_PASS: ${SMTP_PASS:-senha}
+      SMTP_FROM: ${SMTP_FROM:-Ligeirinho Food <no-reply@ligeirinho.local>}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@ligeirinho.local}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin123}
+      ADMIN_NAME: ${ADMIN_NAME:-Admin Global}
+    ports:
+      - "4001:4001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
+  catalog:
+    <<: *app-defaults
+    container_name: ligeirinho-catalog
+    build:
+      context: ./services/catalog
+    environment:
+      PORT: 4002
+      DATABASE_URL: postgres://ligeirinho:ligeirinho@postgres:5432/ligeirinho_catalog
+      JWT_SECRET: super-secret-troque-isto
+      RABBITMQ_URL: amqp://ligeirinho:ligeirinho@rabbitmq:5672
+      SWAGGER_ENABLED: "true"
+      MINIO_SERVER_URL: http://minio:9000
+      MINIO_ROOT_USER: ligeirinho-admin
+      MINIO_ROOT_PASSWORD: ligeirinho-dev-2026
+      MINIO_BUCKET: ligeirinho
+    ports:
+      - "4002:4002"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
+  orders:
+    <<: *app-defaults
+    container_name: ligeirinho-orders
+    build:
+      context: ./services/orders
+    environment:
+      PORT: 4003
+      DATABASE_URL: postgres://ligeirinho:ligeirinho@postgres:5432/ligeirinho_orders
+      JWT_SECRET: super-secret-troque-isto
+      RABBITMQ_URL: amqp://ligeirinho:ligeirinho@rabbitmq:5672
+      SWAGGER_ENABLED: "true"
+    ports:
+      - "4003:4003"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
+  gateway:
+    <<: *app-defaults
+    container_name: ligeirinho-gateway
+    build:
+      context: ./services/gateway
+    environment:
+      PORT: 4000
+      IDENTITY_URL: http://identity:4001
+      CATALOG_URL: http://catalog:4002
+      ORDERS_URL: http://orders:4003
+    ports:
+      - "4000:4000"
+    depends_on:
+      - identity
+      - catalog
+      - orders
 
 volumes:
   pgdata:
+  rabbitmqdata:
   miniodata:
+
+networks:
+  ligeirinho:
