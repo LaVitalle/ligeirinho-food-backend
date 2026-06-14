@@ -37,6 +37,13 @@ async function bootstrap() {
     });
   }
 
+  app.enableCors({
+    origin: ['http://localhost:8080', 'http://localhost:3000'],
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    credentials: true,
+  });
+
   await app.listen(port);
 
   const swaggerUrl = `http://localhost:${port}/docs`;
