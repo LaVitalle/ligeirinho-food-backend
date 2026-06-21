@@ -12,6 +12,10 @@ import {
   CART_REPOSITORY,
   CartRepository,
 } from "../../../cart/domain/repositories/cart.repository";
+import {
+  PAYMENT_METHOD_REPOSITORY,
+  PaymentMethodRepository,
+} from "../../../payment-methods/domain/repositories/payment-method.repository";
 import { CanteenViewRepository } from "../../../projections/infra/repositories/canteen-view.repository";
 import {
   OrderStatus,
@@ -33,14 +37,28 @@ export class OrderService {
     private readonly orderRepository: OrderRepository,
     @Inject(CART_REPOSITORY)
     private readonly cartRepository: CartRepository,
+    @Inject(PAYMENT_METHOD_REPOSITORY)
+    private readonly paymentMethodRepository: PaymentMethodRepository,
     private readonly canteenView: CanteenViewRepository,
     private readonly orderMessaging: OrderMessagingService,
   ) {}
 
-  async createFromCart(user: AuthenticatedUser): Promise<OrderResponseDto> {
+  async createFromCart(
+    user: AuthenticatedUser,
+    paymentMethodId: string,
+  ): Promise<OrderResponseDto> {
     const cartItems = await this.cartRepository.getItems(user.sub);
     if (cartItems.length === 0) {
       throw new ConflictException("Carrinho vazio");
+    }
+
+    const paymentMethod =
+      await this.paymentMethodRepository.findById(paymentMethodId);
+    if (!paymentMethod) {
+      throw new NotFoundException("Método de pagamento não encontrado");
+    }
+    if (!paymentMethod.isActive) {
+      throw new ConflictException("Método de pagamento inativo");
     }
 
     const canteenId = cartItems[0].canteenId;
@@ -77,6 +95,9 @@ export class OrderService {
       customerName: user.name,
       canteenId,
       total,
+      paymentMethodId: paymentMethod.id,
+      paymentMethodNameSnapshot: paymentMethod.name,
+      paymentMethodType: paymentMethod.type,
       items: items.map(({ lineTotal, ...rest }) => rest),
     });
 

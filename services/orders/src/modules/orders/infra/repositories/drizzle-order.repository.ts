@@ -24,6 +24,9 @@ export class DrizzleOrderRepository implements OrderRepository {
     customerName: string;
     canteenId: string;
     total: string;
+    paymentMethodId: string;
+    paymentMethodNameSnapshot: string;
+    paymentMethodType: string;
     items: {
       productId: string;
       productNameSnapshot: string;
@@ -45,6 +48,10 @@ export class DrizzleOrderRepository implements OrderRepository {
         customerName: data.customerName,
         canteenId: data.canteenId,
         total: data.total,
+        paymentMethodId: data.paymentMethodId,
+        paymentMethodNameSnapshot: data.paymentMethodNameSnapshot,
+        paymentMethodType:
+          data.paymentMethodType as (typeof ordersSchema.paymentMethodType.enumValues)[number],
       })
       .returning();
 
@@ -93,6 +100,9 @@ export class DrizzleOrderRepository implements OrderRepository {
       canteenId: order.canteenId,
       status: order.status as OrderStatus,
       total: order.total,
+      paymentMethodId: order.paymentMethodId,
+      paymentMethodNameSnapshot: order.paymentMethodNameSnapshot,
+      paymentMethodType: order.paymentMethodType,
       rating: order.rating,
       ratingComment: order.ratingComment,
       cancelReason: order.cancelReason,
@@ -228,6 +238,9 @@ export class DrizzleOrderRepository implements OrderRepository {
       canteenId: row.canteenId,
       status: row.status as OrderStatus,
       total: row.total,
+      paymentMethodId: row.paymentMethodId,
+      paymentMethodNameSnapshot: row.paymentMethodNameSnapshot,
+      paymentMethodType: row.paymentMethodType,
       rating: row.rating,
       ratingComment: row.ratingComment,
       cancelReason: row.cancelReason,

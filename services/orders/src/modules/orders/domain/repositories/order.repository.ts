@@ -11,6 +11,9 @@ export interface OrderRow {
   canteenId: string;
   status: OrderStatus;
   total: string;
+  paymentMethodId: string;
+  paymentMethodNameSnapshot: string;
+  paymentMethodType: string;
   rating: number | null;
   ratingComment: string | null;
   cancelReason: string | null;
@@ -40,6 +43,9 @@ export interface OrderRepository {
     customerName: string;
     canteenId: string;
     total: string;
+    paymentMethodId: string;
+    paymentMethodNameSnapshot: string;
+    paymentMethodType: string;
     items: {
       productId: string;
       productNameSnapshot: string;

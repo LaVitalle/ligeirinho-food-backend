@@ -1,6 +1,7 @@
 import { Module } from "@nestjs/common";
 import { SharedModule } from "@shared/shared.module";
 import { CartModule } from "../cart/cart.module";
+import { PaymentMethodsModule } from "../payment-methods/payment-methods.module";
 import { ProjectionsModule } from "../projections/projections.module";
 import { ORDER_REPOSITORY } from "./domain/repositories/order.repository";
 import { DrizzleOrderRepository } from "./infra/repositories/drizzle-order.repository";
@@ -11,7 +12,7 @@ import { OrderController } from "./infra/controllers/order.controller";
 import { RatingController } from "./infra/controllers/rating.controller";
 
 @Module({
-  imports: [SharedModule, CartModule, ProjectionsModule],
+  imports: [SharedModule, CartModule, PaymentMethodsModule, ProjectionsModule],
   controllers: [OrderController, RatingController],
   providers: [
     OrderService,

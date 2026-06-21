@@ -5,6 +5,7 @@ import { StatelessAuthModule } from "@shared/infra/auth/stateless-auth.module";
 import { validate } from "./config/env.validation";
 import { CartModule } from "./modules/cart/cart.module";
 import { OrdersModule } from "./modules/orders/orders.module";
+import { PaymentMethodsModule } from "./modules/payment-methods/payment-methods.module";
 import { ProjectionsModule } from "./modules/projections/projections.module";
 import { ReportsModule } from "./modules/reports/reports.module";
 
@@ -20,6 +21,7 @@ import { ReportsModule } from "./modules/reports/reports.module";
     StatelessAuthModule,
     ProjectionsModule,
     CartModule,
+    PaymentMethodsModule,
     OrdersModule,
     ReportsModule,
   ],

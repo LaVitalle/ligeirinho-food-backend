@@ -25,12 +25,18 @@ const services: ServiceRoute[] = [
   {
     name: "catalog",
     url: CATALOG_URL,
-    prefixes: ["/canteens", "/categories", "/products", "/extras"],
+    prefixes: ["/canteens", "/categories", "/icons", "/products", "/extras"],
   },
   {
     name: "orders",
     url: ORDERS_URL,
-    prefixes: ["/cart", "/orders", "/ratings", "/reports"],
+    prefixes: [
+      "/cart",
+      "/orders",
+      "/payment-methods",
+      "/ratings",
+      "/reports",
+    ],
   },
 ];
 

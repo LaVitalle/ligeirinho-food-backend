@@ -8,6 +8,7 @@ import {
   uuid,
   varchar,
 } from "drizzle-orm/pg-core";
+import { paymentMethodTypeEnum } from "../../../payment-methods/infra/schemas/payment-method.schema";
 
 export const orderStatusEnum = pgEnum("order_status", [
   "AGUARDANDO",
@@ -26,6 +27,11 @@ export const ordersSchema = pgTable("orders", {
   canteenId: uuid("canteen_id").notNull(),
   status: orderStatusEnum("status").notNull().default("AGUARDANDO"),
   total: numeric("total", { precision: 10, scale: 2 }).notNull(),
+  paymentMethodId: uuid("payment_method_id").notNull(),
+  paymentMethodNameSnapshot: varchar("payment_method_name_snapshot", {
+    length: 100,
+  }).notNull(),
+  paymentMethodType: paymentMethodTypeEnum("payment_method_type").notNull(),
   rating: integer("rating"),
   ratingComment: text("rating_comment"),
   cancelReason: text("cancel_reason"),

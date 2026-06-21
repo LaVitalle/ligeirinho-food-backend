@@ -10,7 +10,14 @@ import {
   Post,
   Query,
 } from "@nestjs/common";
-import { ApiBearerAuth, ApiOperation, ApiTags } from "@nestjs/swagger";
+import {
+  ApiBearerAuth,
+  ApiBody,
+  ApiOperation,
+  ApiParam,
+  ApiQuery,
+  ApiTags,
+} from "@nestjs/swagger";
 import type { AuthenticatedUser } from "@shared/infra/auth/authenticated-user.interface";
 import { UserRole } from "@shared/domain/enums/user-role.enum";
 import { CurrentUser } from "@shared/infra/decorators/current-user.decorator";
@@ -27,6 +34,7 @@ import {
 } from "../../domain/models/order-status";
 import {
   CancelOrderDto,
+  CreateOrderDto,
   OrderResponseDto,
   RateOrderDto,
 } from "../../application/dto/order.dto";
@@ -64,16 +72,29 @@ export class OrderController {
   @Post()
   @Roles(UserRole.CUSTOMER)
   @ApiOperation({ summary: "Cria pedido a partir do carrinho" })
+  @ApiBody({ type: CreateOrderDto })
   @ResponseMessage("Pedido criado com sucesso")
   @ApiWrappedResponse(OrderResponseDto, { description: "Pedido criado" })
   @HateoasItem<OrderResponseDto>({ basePath: "/orders", itemLinks: orderLinks })
-  async create(@CurrentUser() user: AuthenticatedUser) {
-    return this.orderService.createFromCart(user);
+  async create(
+    @Body() dto: CreateOrderDto,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.orderService.createFromCart(user, dto.paymentMethodId);
   }
 
   @Get("me")
   @Roles(UserRole.CUSTOMER)
   @ApiOperation({ summary: "Pedidos do cliente (open/history)" })
+  @ApiQuery({
+    name: "status",
+    required: false,
+    type: String,
+    description: "Filtro de pedidos: \"open\" para pedidos em andamento, \"history\" para pedidos finalizados/cancelados",
+    example: "open",
+  })
+  @ApiQuery({ name: "page", required: false, type: Number, description: "Número da página (default: 1)", example: 1 })
+  @ApiQuery({ name: "perPage", required: false, type: Number, description: "Itens por página (default: 10)", example: 10 })
   @ResponseMessage("Pedidos listados")
   @ApiWrappedResponse(OrderResponseDto, { isArray: true, description: "Pedidos" })
   @HateoasList<OrderResponseDto>({ basePath: "/orders", itemLinks: orderLinks })
@@ -89,6 +110,15 @@ export class OrderController {
   @Get("canteen")
   @Roles(UserRole.SELLER)
   @ApiOperation({ summary: "Fila de pedidos da cantina" })
+  @ApiQuery({
+    name: "status",
+    required: false,
+    type: String,
+    description: "Filtro por status do pedido. Vazio retorna todos os status ativos (fila completa).",
+    example: "AGUARDANDO_CONFIRMACAO",
+  })
+  @ApiQuery({ name: "page", required: false, type: Number, description: "Número da página (default: 1)", example: 1 })
+  @ApiQuery({ name: "perPage", required: false, type: Number, description: "Itens por página (default: 10)", example: 10 })
   @ResponseMessage("Pedidos da cantina listados")
   @ApiWrappedResponse(OrderResponseDto, { isArray: true, description: "Pedidos" })
   @HateoasList<OrderResponseDto>({ basePath: "/orders", itemLinks: orderLinks })
@@ -108,6 +138,7 @@ export class OrderController {
 
   @Get(":id")
   @ApiOperation({ summary: "Detalhe do pedido" })
+  @ApiParam({ name: "id", description: "UUID do pedido", example: "a1b2c3d4-e5f6-7890-abcd-ef1234567890" })
   @ResponseMessage("Pedido encontrado")
   @ApiWrappedResponse(OrderResponseDto, { description: "Pedido" })
   @HateoasItem<OrderResponseDto>({ basePath: "/orders", itemLinks: orderLinks })
@@ -118,6 +149,7 @@ export class OrderController {
   @Patch(":id/advance")
   @Roles(UserRole.SELLER)
   @ApiOperation({ summary: "Avança status do pedido" })
+  @ApiParam({ name: "id", description: "UUID do pedido", example: "a1b2c3d4-e5f6-7890-abcd-ef1234567890" })
   @ResponseMessage("Status avançado")
   @ApiWrappedResponse(OrderResponseDto, { description: "Pedido atualizado" })
   @HateoasItem<OrderResponseDto>({ basePath: "/orders", itemLinks: orderLinks })
@@ -131,6 +163,7 @@ export class OrderController {
   @Patch(":id/pickup")
   @Roles(UserRole.CUSTOMER)
   @ApiOperation({ summary: "Confirma retirada (JÁ RETIREI)" })
+  @ApiParam({ name: "id", description: "UUID do pedido", example: "a1b2c3d4-e5f6-7890-abcd-ef1234567890" })
   @ResponseMessage("Retirada confirmada")
   @ApiWrappedResponse(OrderResponseDto, { description: "Pedido retirado" })
   @HateoasItem<OrderResponseDto>({ basePath: "/orders", itemLinks: orderLinks })
@@ -144,6 +177,8 @@ export class OrderController {
   @Patch(":id/cancel")
   @Roles(UserRole.CUSTOMER, UserRole.SELLER)
   @ApiOperation({ summary: "Cancela pedido" })
+  @ApiParam({ name: "id", description: "UUID do pedido", example: "a1b2c3d4-e5f6-7890-abcd-ef1234567890" })
+  @ApiBody({ type: CancelOrderDto })
   @ResponseMessage("Pedido cancelado")
   @ApiWrappedResponse(OrderResponseDto, { description: "Pedido cancelado" })
   @HateoasItem<OrderResponseDto>({ basePath: "/orders", itemLinks: orderLinks })
@@ -158,6 +193,8 @@ export class OrderController {
   @Patch(":id/rating")
   @Roles(UserRole.CUSTOMER)
   @ApiOperation({ summary: "Avalia pedido (1-5)" })
+  @ApiParam({ name: "id", description: "UUID do pedido", example: "a1b2c3d4-e5f6-7890-abcd-ef1234567890" })
+  @ApiBody({ type: RateOrderDto })
   @ResponseMessage("Avaliação registrada")
   async rate(
     @Param("id", ParseUUIDPipe) id: string,

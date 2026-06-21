@@ -5,6 +5,7 @@ import { StatelessAuthModule } from "@shared/infra/auth/stateless-auth.module";
 import { validate } from "./config/env.validation";
 import { CanteensModule } from "./modules/canteens/canteens.module";
 import { CategoriesModule } from "./modules/categories/categories.module";
+import { IconsModule } from "./modules/icons/icons.module";
 import { ProductsModule } from "./modules/products/products.module";
 import { ExtrasModule } from "./modules/extras/extras.module";
 
@@ -20,6 +21,7 @@ import { ExtrasModule } from "./modules/extras/extras.module";
     StatelessAuthModule,
     CanteensModule,
     CategoriesModule,
+    IconsModule,
     ProductsModule,
     ExtrasModule,
   ],
