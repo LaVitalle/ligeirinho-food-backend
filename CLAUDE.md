@@ -40,14 +40,16 @@ Estes são exigências do PI (não são "nice-to-have"):
 
 | Requisito | Estado | Observação |
 |---|---|---|
-| **3 microserviços** | ❌ Não iniciado | Vamos seguir com **Modular Monolith** até definirmos exatamente como dividir os bounded contexts em serviços separados. A arquitetura DDD atual **já facilita** essa quebra futura — cada módulo é um candidato a microserviço. |
-| **Swagger / OpenAPI** | ✅ Implementado | Habilitado em `/docs`, abre automaticamente em dev. DTOs documentados via `@ApiWrappedResponse(Model)`. |
-| **HyperOAS / HATEOAS** | ❌ Não iniciado | Hipermídia como engine do estado da aplicação. Endpoints precisarão retornar `_links` com ações relacionadas (ex.: pedido em `AGUARDANDO` traz link `advance`, `cancel`, etc.). Implementação será incremental conforme cada endpoint for criado. |
+| **3 microserviços** | ✅ Implementado | `identity`, `catalog`, `orders` (+ `gateway`). Cada um com seu próprio banco Postgres e responsabilidade bem definida. |
+| **Mensageria (publisher + consumer)** | ✅ Implementado | RabbitMQ (`amqplib`). Cada serviço publica e consome eventos (ver §4.2). Projeções locais garantem isolamento de banco. |
+| **Banco por serviço** | ✅ Implementado | `ligeirinho_identity`, `ligeirinho_catalog`, `ligeirinho_orders`. Sem acesso cruzado — dados replicados por eventos (`*_view`). |
+| **Swagger / OpenAPI** | ✅ Implementado | `/docs` por serviço; gateway agrega em `/identity/docs`, `/catalog/docs`, `/orders/docs`. |
+| **HATEOAS** | ✅ Implementado | `@HateoasItem`/`@HateoasList` injetam `_links` no envelope via `TransformInterceptor` (shared). |
 
-**Estratégia de microserviços (a definir):**
-- Por ora, todos os módulos vivem no mesmo processo (monolito modular).
-- Quando for dividir, candidatos naturais são: `auth+users`, `catalog` (institutions+canteens+categories+products+extras), `orders` (cart+orders+ratings), `notifications`. Mas isso será discutido formalmente antes de qualquer split.
-- O DDD **garante** que a divisão futura não exija reescrita: cada módulo já comunica via interfaces (Repository/Symbol tokens), nunca por acesso direto.
+**Topologia (implementada):**
+- Monorepo de **desenvolvimento** em `services/*`; cada serviço é **autossuficiente** (shared vendorizado) e vai para o **seu próprio repo GitHub** no deploy (EasyPanel). Ver `README.md` → *Split & Deploy*.
+- Divisão por bounded context: `identity` (auth+users+institutions+location), `catalog` (canteens+categories+products+extras), `orders` (cart+orders+ratings+reports), `gateway` (proxy + Swagger agregado).
+- Comunicação **assíncrona** via RabbitMQ; nunca por acesso direto a banco de outro serviço.
 
 ---
 
@@ -57,9 +59,10 @@ Estes são exigências do PI (não são "nice-to-have"):
 |---|---|
 | **NestJS 11** | Framework HTTP |
 | **TypeScript ES2023** | Linguagem |
-| **PostgreSQL 17** | Banco de dados relacional |
+| **PostgreSQL 17** | Banco de dados relacional (um por serviço) |
 | **Drizzle ORM** | ORM e migrations |
-| **MinIO** | Armazenamento de objetos (imagens) |
+| **RabbitMQ (amqplib)** | Mensageria assíncrona entre serviços |
+| **MinIO** | Armazenamento de objetos (imagens, no catalog) |
 | **Nodemailer** | Envio de e-mail SMTP |
 | **JWT + Passport + bcryptjs** | Autenticação |
 | **class-validator / class-transformer** | Validação de DTOs |
@@ -70,70 +73,74 @@ Estes são exigências do PI (não são "nice-to-have"):
 
 ## 4. Arquitetura
 
-**Padrão atual: Clean Architecture + DDD em Modular Monolith.**
+**Padrão: microsserviços NestJS (Clean Architecture + DDD por serviço), monorepo de dev + polyrepo de deploy.**
 
-Cada feature é um módulo independente (bounded context) com 3 camadas:
+### 4.1 Estrutura do monorepo
+
+```
+ligeirinho-food-backend/        (monorepo de DEV — não é deployado direto)
+├── shared/src/                 ← fonte canônica do código compartilhado
+│   ├── application/dto/         ← PaginatedResult
+│   ├── domain/enums/            ← UserRole
+│   ├── contracts/events/        ← enums + payloads dos eventos (RabbitMQ)
+│   └── infra/                   ← drizzle, messaging, hateoas, http/bootstrap,
+│                                  guards, auth (stateless), email, storage, ...
+├── services/
+│   ├── gateway/                 ← reverse proxy (Express) + Swagger agregado
+│   ├── identity/                ← auth, users, institutions, location, email
+│   ├── catalog/                 ← canteens, categories, products, extras (MinIO)
+│   └── orders/                  ← cart, orders, ratings, reports (+ projeções)
+├── docker/postgres/init/        ← cria os 3 bancos
+├── docker-compose.yml           ← Postgres + RabbitMQ + MinIO + Adminer + 4 apps
+└── scripts/{shared-sync,split-repos}.mjs
+```
+
+Cada `services/<svc>` é **autossuficiente**: tem `package.json`, `Dockerfile`, `drizzle/` e uma **cópia vendorizada** do shared em `src/shared` (alias `@shared/*`). A fonte canônica é `shared/src`; `npm run shared:sync` propaga para os serviços. **Edite só em `shared/src`.**
+
+Dentro de cada serviço, cada módulo mantém as 3 camadas DDD:
 
 ```
 src/modules/<modulo>/
-├── domain/                    ← regras de negócio (sem framework)
-│   ├── models/                ← entidades com restore() + withX()
-│   └── repositories/          ← interfaces + Symbol tokens
-├── application/               ← casos de uso
-│   ├── services/              ← orquestram domain + repositories
-│   └── dto/                   ← objetos de transferência
-└── infra/                     ← acoplamento com framework/banco
-    ├── controllers/           ← endpoints HTTP
-    ├── repositories/          ← implementações Drizzle
-    └── schemas/               ← tabelas Drizzle
+├── domain/        ← models (restore()/withX()) + repositories (interfaces + Symbol tokens)
+├── application/   ← services (casos de uso) + dto + *-messaging.service.ts (publishers)
+└── infra/         ← controllers + repositories (Drizzle) + schemas
 ```
 
 **Regras invioláveis:**
-- `domain` não importa de `application` nem `infra`.
-- `application` não importa de `infra`.
-- `controllers` não têm lógica de negócio — só delegam para o service.
-- Repositórios são abstrações no domínio; implementação é injetada via Symbol token (DIP).
+- `domain` não importa de `application` nem `infra`; `application` não importa de `infra`.
+- `controllers` só delegam para o service; repositórios são injetados via Symbol token (DIP).
+- **Nenhum serviço acessa o banco de outro.** Dados de outro contexto chegam por **evento** e viram projeção local read-only (ex.: `products_view`, `canteens_view` no orders).
+- Auth: `identity` é dono dos usuários (lookup no DB via Passport). `catalog`/`orders` usam `StatelessAuthModule` (verificam só a assinatura do JWT; claims em `AuthenticatedUser`).
+
+### 4.2 Eventos (RabbitMQ — 1 exchange `direct`/durável por evento)
+
+Publishers em `*-messaging.service.ts` (assertExchange no `OnApplicationBootstrap`); consumers em `*-message-consumer.service.ts` (canal próprio + assertQueue/bind/consume + ack/nack). Contratos em `shared/src/contracts/events/`.
+
+| Evento | Publica | Consome | Efeito |
+|---|---|---|---|
+| `canteen.created` | catalog | identity | cria SELLER → publica `seller.created` |
+| `seller.created` | identity | catalog | grava `canteen.seller_id` |
+| `canteen.updated` | catalog | orders | projeção `canteens_view` |
+| `product.upserted`/`product.deleted` | catalog | orders | projeção `products_view` |
+| `order.created` | orders | identity | e-mail de confirmação |
+| `order.status_changed` | orders | identity | e-mail de status |
 
 Detalhes completos: [docs/arquitetura.md](docs/arquitetura.md).
 
-### Estrutura compartilhada
+### Código compartilhado (`shared/src`)
 
-```
-src/shared/
-├── shared.module.ts
-├── domain/
-│   └── enums/                 ← UserRole, etc.
-├── application/
-│   └── dto/                   ← PaginatedResult
-└── infra/
-    ├── config/                ← env.validation.ts
-    ├── database/              ← DrizzleService + seeds
-    ├── decorators/            ← @Public, @Roles, @CurrentUser, @ResponseMessage
-    ├── email/                 ← EmailService + templates
-    ├── filters/               ← GlobalExceptionFilter
-    ├── guards/                ← JwtAuthGuard, RolesGuard
-    ├── interceptors/          ← TransformInterceptor
-    ├── repositories/          ← ErrorLogRepository
-    ├── schemas/               ← error_log
-    ├── storage/               ← MinioService
-    └── swagger/               ← ApiWrappedResponse
-```
+`shared.module.ts` (global: DrizzleService, RabbitMQService, SharedMessagingService, ErrorLogRepository, TransformInterceptor, GlobalExceptionFilter) + `domain/enums` (UserRole) + `application/dto` (PaginatedResult) + `contracts/events` (eventos) + `infra/`: `config` (env base + `createEnvValidator`), `database` (DrizzleService), `decorators`, `email` (EmailModule — opcional), `storage` (StorageModule — opcional), `filters`, `guards` (JwtAuthGuard Passport + RolesGuard), `auth` (StatelessAuthModule + StatelessJwtAuthGuard + AuthenticatedUser), `hateoas`, `http` (bootstrapHttpApp), `interceptors`, `messaging` (RabbitMQService + SharedMessagingService), `repositories`, `schemas`, `swagger`.
 
-### Módulos atuais
+### Serviços e módulos
 
-| Módulo | Estado | Responsabilidade |
-|---|---|---|
-| `auth` | ✅ | Login, registro, recuperação de senha, JWT |
-| `users` | ✅ | Entidade/repositório de usuários (sem controller próprio) |
-| `location` | ✅ | Estados e cidades (públicos) |
-| `institutions` | ✅ | CRUD ADMIN + validação pública de access_code |
-| `canteens` | ❌ | Pendente |
-| `categories` | ❌ | Pendente |
-| `products` / `extras` | ❌ | Pendente |
-| `cart` / `orders` / `ratings` | ❌ | Pendente |
-| `reports` / `notifications` | ❌ | Pendente |
+| Serviço | Porta / DB | Módulos | Estado |
+|---|---|---|---|
+| `gateway` | 4000 / — | reverse proxy + Swagger agregado | ✅ |
+| `identity` | 4001 / `ligeirinho_identity` | auth, users, location, institutions, integration (consumers/publisher) | ✅ |
+| `catalog` | 4002 / `ligeirinho_catalog` | canteens, categories, products, extras | ✅ |
+| `orders` | 4003 / `ligeirinho_orders` | cart, orders, ratings, reports, projections | ✅ |
 
-Backlog completo e ordem de execução: [docs/backlog-backend.md](docs/backlog-backend.md).
+Backlog de features: [docs/backlog-backend.md](docs/backlog-backend.md).
 
 ---
 
